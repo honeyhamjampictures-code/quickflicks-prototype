@@ -41,7 +41,7 @@
       font-size:24px;
       color:white;
       background: rgba(0,0,0,0.6);
-      pointer-events:none; /* Overlay does not block iframe click */
+      pointer-events:none; /* overlay does not block iframe */
     }
 
     .loading-overlay {
@@ -58,7 +58,7 @@
       background: rgba(0,0,0,0.8);
       color:white;
       font-size:24px;
-      display:none;
+      display:none; /* hidden initially */
     }
 
     .spinner {
@@ -164,7 +164,7 @@ function renderCarousel() {
       loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
       container.appendChild(loadingOverlay);
 
-      stateFlags[i] = { preRollDone: false, loadingOverlay };
+      stateFlags[i] = { preRollDone: false, tapOverlay, loadingOverlay };
     }
 
     carousel.appendChild(container);
@@ -184,22 +184,26 @@ function onYouTubeIframeAPIReady() {
         onStateChange: function(event) {
           const container = carousel.children[i];
           const playerDiv = container.querySelector(`#player-${i}`);
-          const loadingOverlay = stateFlags[i].loadingOverlay;
+          const flags = stateFlags[i];
 
           if (event.data === YT.PlayerState.PLAYING) {
             playerDiv.style.opacity = 1;
 
-            if (!stateFlags[i].preRollDone) {
-              // Show loading overlay briefly during pre-roll
-              loadingOverlay.style.display = "flex";
+            // Hide tap overlay after first click/play
+            if (flags.tapOverlay) {
+              flags.tapOverlay.style.display = "none";
+            }
+
+            // Show loading overlay briefly if pre-roll not done
+            if (!flags.preRollDone) {
+              if (flags.loadingOverlay) flags.loadingOverlay.style.display = "flex";
 
               setTimeout(() => {
                 players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
                 players[i].unMute();
-                stateFlags[i].preRollDone = true;
+                flags.preRollDone = true;
+                if (flags.loadingOverlay) flags.loadingOverlay.style.display = "none";
               }, 10000);
-            } else {
-              loadingOverlay.style.display = "none";
             }
           }
         }
