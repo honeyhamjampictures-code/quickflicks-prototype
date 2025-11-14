@@ -1,203 +1,93 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ReelShorts Carousel</title>
+  <title>Mini ReelShort Web App (YouTube Version)</title>
   <style>
-    body { margin:0; font-family: Arial; overflow-x:hidden; background:black; color:white; }
-    #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
-
-    .episode-container {
-      min-width: 100%;
-      height: 100vh;
-      scroll-snap-align:start;
-      position: relative;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background:black;
-    }
-
-    .locked {
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      font-size:28px;
-      cursor:pointer;
-      text-align:center;
-      padding:20px;
-    }
-
-    .loading-overlay {
-      position:absolute;
-      top:0;
-      left:0;
-      width:100%;
-      height:100%;
-      display:none; /* hidden initially */
-      flex-direction: column;
-      justify-content:center;
-      align-items:center;
-      z-index:2;
-      background: rgba(0,0,0,0.8);
-      color:white;
-      font-size:24px;
-      pointer-events:none; /* does not block clicks */
-    }
-
-    .spinner {
-      border: 6px solid rgba(255,255,255,0.3);
-      border-top: 6px solid white;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 10px;
-    }
-
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    #paywall {
-      position: fixed;
-      top:50%; left:50%;
-      transform: translate(-50%, -50%);
-      padding: 20px;
-      border: 2px solid #aaa;
-      background: #fff;
-      color:black;
-      display: none;
-      z-index: 10;
-      text-align:center;
-    }
-    #close-paywall { margin-left:10px; }
-
-    .arrow {
-      position: absolute;
-      top: 50%;
-      font-size: 48px;
-      color: white;
-      background: rgba(0,0,0,0.3);
-      padding: 10px;
-      cursor: pointer;
-      z-index: 5;
-      user-select: none;
-    }
-    #arrow-left { left: 10px; transform: translateY(-50%); }
-    #arrow-right { right: 10px; transform: translateY(-50%); }
+    body { font-family: Arial; padding: 20px; max-width: 500px; margin: auto; }
+    .episode { padding: 10px; border: 1px solid #ccc; margin-bottom: 8px; cursor: pointer; }
+    .locked { background: #eee; color: #777; cursor: not-allowed; }
+    #adPlayer { width: 100%; height: auto; display: none; margin-top: 20px; }
+    #ytPlayer { width: 100%; height: 280px; display: none; margin-top: 20px; border: none; }
+    #paywall { padding: 20px; border: 1px solid #aaa; margin-top: 20px; display: none; }
   </style>
 </head>
 <body>
 
-<div id="carousel"></div>
-<div id="arrow-left" class="arrow">&#10094;</div>
-<div id="arrow-right" class="arrow">&#10095;</div>
+<h2>Series Title</h2>
+<p>Episodes 1–3 are free. Episodes 4+ require purchase.</p>
+
+<div id="episodes"></div>
+
+<!-- Pre-roll ad player -->
+<video id="adPlayer" controls></video>
+
+<!-- YouTube episode player -->
+<iframe id="ytPlayer" allowfullscreen></iframe>
 
 <div id="paywall">
   <h3>Unlock All Episodes</h3>
-  <p>Purchase the full season to access all locked episodes.</p>
+  <p>Get full access to all remaining episodes.</p>
   <a href="YOUR_PAYPAL_LINK_HERE" target="_blank">
-    <button>Unlock Now</button>
+    <button style="padding:10px 20px;">Unlock Season</button>
   </a>
-  <button id="close-paywall">Close</button>
 </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
 <script>
+// Episode list: replace VIDEO_ID with your unlisted YouTube IDs
 const episodes = [
-  { yt: "aKk1p0EiWXs", ad: "AD_VIDEO_ID_1", free: true },
-  { yt: "EPISODE_VIDEO_ID_2", ad: "AD_VIDEO_ID_2", free: false },
-  { yt: "EPISODE_VIDEO_ID_3", ad: "AD_VIDEO_ID_3", free: false },
-  { yt: "EPISODE_VIDEO_ID_4", ad: "AD_VIDEO_ID_4", free: false },
-  { yt: "EPISODE_VIDEO_ID_5", ad: "AD_VIDEO_ID_5", free: false }
+  { title: "aKk1p0EiWXs", yt: "VIDEO_ID_1", free: true },
+  { title: "CuK_NZ01u-I", yt: "VIDEO_ID_2", free: true },
+  { title: "Episode 3", yt: "VIDEO_ID_3", free: true },
+  { title: "Episode 4", yt: "VIDEO_ID_4", free: false },
+  { title: "Episode 5", yt: "VIDEO_ID_5", free: false },
 ];
 
-const carousel = document.getElementById("carousel");
+// Your 10-second ad video (MP4 you host anywhere)
+const adUrl = "videos/ad10sec.mp4";
+
+const episodesDiv = document.getElementById("episodes");
+const adPlayer = document.getElementById("adPlayer");
+const ytPlayer = document.getElementById("ytPlayer");
 const paywall = document.getElementById("paywall");
-const closePay = document.getElementById("close-paywall");
-let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
-const players = [];
-const stateFlags = [];
 
-function renderCarousel() {
-  carousel.innerHTML = "";
+// Render episode list
+episodes.forEach((ep, i) => {
+  const div = document.createElement("div");
+  div.className = "episode" + (ep.free ? "" : " locked");
+  div.innerText = ep.title;
 
-  episodes.forEach((ep, i) => {
-    const container = document.createElement("div");
-    container.className = "episode-container";
-
-    if (!ep.free && !unlocked) {
-      container.classList.add("locked");
-      container.innerText = "Locked – Tap to Unlock";
-      container.onclick = () => { paywall.style.display = "block"; };
+  div.onclick = () => {
+    if (ep.free) {
+      playWithAd(ep.yt);
     } else {
-      const playerDiv = document.createElement("div");
-      playerDiv.id = `player-${i}`;
-      playerDiv.style.width = "100%";
-      playerDiv.style.height = "100%";
-      container.appendChild(playerDiv);
-
-      const loadingOverlay = document.createElement("div");
-      loadingOverlay.className = "loading-overlay";
-      loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
-      container.appendChild(loadingOverlay);
-
-      stateFlags[i] = { preRollDone: false, loadingOverlay };
+      // Show paywall
+      paywall.style.display = "block";
+      adPlayer.style.display = "none";
+      ytPlayer.style.display = "none";
     }
+  };
 
-    carousel.appendChild(container);
-  });
+  episodesDiv.appendChild(div);
+});
+
+// Play pre-roll ad then the YouTube episode
+function playWithAd(ytId) {
+  paywall.style.display = "none";
+
+  // Show video player
+  adPlayer.style.display = "block";
+  ytPlayer.style.display = "none";
+
+  adPlayer.src = adUrl;
+  adPlayer.play();
+
+  // When ad finishes, load YouTube iframe
+  adPlayer.onended = () => {
+    adPlayer.style.display = "none";
+    ytPlayer.style.display = "block";
+    ytPlayer.src = "https://www.youtube.com/embed/" + ytId + "?autoplay=1&rel=0";
+  };
 }
-
-function onYouTubeIframeAPIReady() {
-  episodes.forEach((ep, i) => {
-    if (!ep.free && !unlocked) return;
-
-    players[i] = new YT.Player(`player-${i}`, {
-      height: '100%',
-      width: '100%',
-      videoId: ep.ad,
-      playerVars: { 'rel':0, 'modestbranding':1 },
-      events: {
-        onStateChange: function(event) {
-          const container = carousel.children[i];
-          const playerDiv = container.querySelector(`#player-${i}`);
-          const flags = stateFlags[i];
-
-          if (event.data === YT.PlayerState.PLAYING) {
-            // Show spinner briefly if needed
-            if (!flags.preRollDone && flags.loadingOverlay) {
-              flags.loadingOverlay.style.display = "flex";
-            }
-
-            // Transition from pre-roll → main episode
-            if (!flags.preRollDone) {
-              setTimeout(() => {
-                players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
-                players[i].unMute();
-                flags.preRollDone = true;
-                if (flags.loadingOverlay) flags.loadingOverlay.style.display = "none";
-              }, 10000); // 10s pre-roll
-            } else {
-              if (flags.loadingOverlay) flags.loadingOverlay.style.display = "none";
-            }
-          }
-        }
-      }
-    });
-  });
-}
-
-// Arrow navigation
-document.getElementById('arrow-left').onclick = () => {
-  carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
-};
-document.getElementById('arrow-right').onclick = () => {
-  carousel.scrollBy({ left: window.innerWidth, behavior: 'smooth' });
-};
-
-// Paywall
-closePay.onclick = () => { paywall.style.display = "none"; };
-
-renderCarousel();
 </script>
 
 </body>
