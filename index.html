@@ -1,13 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mini ReelShort Web App (YouTube Version)</title>
+  <title>Mini ReelShort Web App (YouTube Ads + Episodes)</title>
   <style>
     body { font-family: Arial; padding: 20px; max-width: 500px; margin: auto; }
     .episode { padding: 10px; border: 1px solid #ccc; margin-bottom: 8px; cursor: pointer; }
     .locked { background: #eee; color: #777; cursor: not-allowed; }
-    #adPlayer { width: 100%; height: auto; display: none; margin-top: 20px; }
-    #ytPlayer { width: 100%; height: 280px; display: none; margin-top: 20px; border: none; }
+    #ytPlayer { width: 100%; height: 280px; display: none; border: none; margin-top: 20px; position: relative; }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 2;
+    }
     #paywall { padding: 20px; border: 1px solid #aaa; margin-top: 20px; display: none; }
   </style>
 </head>
@@ -18,37 +29,36 @@
 
 <div id="episodes"></div>
 
-<!-- Pre-roll ad player -->
-<video id="adPlayer" controls></video>
-
-<!-- YouTube episode player -->
-<iframe id="ytPlayer" allowfullscreen></iframe>
+<div style="position: relative;">
+  <iframe id="ytPlayer" allowfullscreen></iframe>
+  <div id="overlay" style="display:none;">▶ TAP TO PLAY AD</div>
+</div>
 
 <div id="paywall">
   <h3>Unlock All Episodes</h3>
-  <p>Get full access to all remaining episodes.</p>
+  <p>Purchase the full season to access episodes 4–23.</p>
   <a href="YOUR_PAYPAL_LINK_HERE" target="_blank">
-    <button style="padding:10px 20px;">Unlock Season</button>
+    <button style="padding:10px 20px;">Unlock Now</button>
   </a>
 </div>
 
 <script>
-// Episode list: replace VIDEO_ID with your unlisted YouTube IDs
 const episodes = [
-  { title: "aKk1p0EiWXs", yt: "VIDEO_ID_1", free: true },
-  { title: "CuK_NZ01u-I", yt: "VIDEO_ID_2", free: true },
-  { title: "Episode 3", yt: "VIDEO_ID_3", free: true },
-  { title: "Episode 4", yt: "VIDEO_ID_4", free: false },
-  { title: "Episode 5", yt: "VIDEO_ID_5", free: false },
+  { title: "Episode 1", yt: "aKk1p0EiWXs", free: true, ad: "AD_VIDEO_ID_1" },
+  { title: "Episode 2", yt: "CuK_NZ01u-I", free: true, ad: "AD_VIDEO_ID_2" },
+  { title: "Episode 3", yt: "EPISODE_VIDEO_ID_3", free: true, ad: "AD_VIDEO_ID_3" },
+  { title: "Episode 4", yt: "EPISODE_VIDEO_ID_4", free: false, ad: "AD_VIDEO_ID_4" },
+  { title: "Episode 5", yt: "EPISODE_VIDEO_ID_5", free: false, ad: "AD_VIDEO_ID_5" },
+  // add more episodes here
 ];
 
-// Your 10-second ad video (MP4 you host anywhere)
-const adUrl = "videos/ad10sec.mp4";
-
 const episodesDiv = document.getElementById("episodes");
-const adPlayer = document.getElementById("adPlayer");
 const ytPlayer = document.getElementById("ytPlayer");
+const overlay = document.getElementById("overlay");
 const paywall = document.getElementById("paywall");
+
+let currentAdId = "";
+let currentEpisodeId = "";
 
 // Render episode list
 episodes.forEach((ep, i) => {
@@ -58,35 +68,41 @@ episodes.forEach((ep, i) => {
 
   div.onclick = () => {
     if (ep.free) {
-      playWithAd(ep.yt);
+      currentAdId = ep.ad;
+      currentEpisodeId = ep.yt;
+      playAd(currentAdId);
     } else {
       // Show paywall
       paywall.style.display = "block";
-      adPlayer.style.display = "none";
       ytPlayer.style.display = "none";
+      overlay.style.display = "none";
     }
   };
 
   episodesDiv.appendChild(div);
 });
 
-// Play pre-roll ad then the YouTube episode
-function playWithAd(ytId) {
-  paywall.style.display = "none";
+// Show ad overlay and wait for user tap
+function playAd(adId) {
+  ytPlayer.style.display = "block";
+  overlay.style.display = "flex";
+  ytPlayer.src = "https://www.youtube.com/embed/" + adId + "?rel=0";
+}
 
-  // Show video player
-  adPlayer.style.display = "block";
-  ytPlayer.style.display = "none";
+// Overlay click: start ad playback
+overlay.onclick = () => {
+  overlay.style.display = "none";
 
-  adPlayer.src = adUrl;
-  adPlayer.play();
+  // Listen for the end of ad using YouTube Player API
+  // For simplicity, we'll auto-switch after estimated ad duration (10s)
+  setTimeout(() => {
+    playEpisode(currentEpisodeId);
+  }, 10000); // 10-second ad duration
+};
 
-  // When ad finishes, load YouTube iframe
-  adPlayer.onended = () => {
-    adPlayer.style.display = "none";
-    ytPlayer.style.display = "block";
-    ytPlayer.src = "https://www.youtube.com/embed/" + ytId + "?autoplay=1&rel=0";
-  };
+// Switch to episode video
+function playEpisode(episodeId) {
+  ytPlayer.src = "https://www.youtube.com/embed/" + episodeId + "?autoplay=1&rel=0";
 }
 </script>
 
