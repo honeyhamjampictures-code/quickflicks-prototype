@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ReelShorts Carousel with Paywall</title>
+  <title>ReelShorts Dynamic Carousel with Paywall</title>
   <style>
     body { margin:0; background:black; overflow-x:hidden; font-family: Arial; }
     #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
@@ -53,7 +53,7 @@
       height:100%;
       background: rgba(0,0,0,0.85);
       color:white;
-      display:none; /* HIDDEN by default */
+      display:none; /* hidden by default */
       flex-direction: column;
       justify-content:center;
       align-items:center;
@@ -85,65 +85,7 @@
 </head>
 <body>
 
-<div id="carousel">
-  <!-- Episode 1 -->
-  <div class="episode-container">
-    <div id="player-0"></div>
-    <div class="loading-overlay" id="loading-0">
-      <div class="spinner"></div>
-      Loading...
-    </div>
-    <div class="locked-overlay" id="locked-0">
-      <p>Locked episode</p>
-      <a href="https://www.paypal.com/pay?your_button_id" target="_blank">
-        <button>Pay to Unlock</button>
-      </a>
-    </div>
-  </div>
-  <!-- Episode 2 -->
-  <div class="episode-container">
-    <div id="player-1"></div>
-    <div class="loading-overlay" id="loading-1">
-      <div class="spinner"></div>
-      Loading...
-    </div>
-    <div class="locked-overlay" id="locked-1">
-      <p>Locked episode</p>
-      <a href="https://www.paypal.com/pay?your_button_id" target="_blank">
-        <button>Pay to Unlock</button>
-      </a>
-    </div>
-  </div>
-  <!-- Episode 3 -->
-  <div class="episode-container">
-    <div id="player-2"></div>
-    <div class="loading-overlay" id="loading-2">
-      <div class="spinner"></div>
-      Loading...
-    </div>
-    <div class="locked-overlay" id="locked-2">
-      <p>Locked episode</p>
-      <a href="https://www.paypal.com/pay?your_button_id" target="_blank">
-        <button>Pay to Unlock</button>
-      </a>
-    </div>
-  </div>
- <!-- Episode 4 -->
-<div class="episode-container">
-  <div id="player-3"></div>
-  <div class="loading-overlay" id="loading-3">
-    <div class="spinner"></div>
-    Loading...
-  </div>
-  <div class="locked-overlay" id="locked-3">
-    <p>Locked episode</p>
-    <a href="https://www.paypal.com/pay?your_button_id" target="_blank">
-      <button>Pay to Unlock</button>
-    </a>
-  </div>
-</div>
-
-</div>
+<div id="carousel"></div>
 
 <div id="arrow-left" class="arrow">&#10094;</div>
 <div id="arrow-right" class="arrow">&#10095;</div>
@@ -153,26 +95,55 @@
 const videoIds = [
   'CuK_NZ01u-I', // Episode 1
   'aKk1p0EiWXs', // Episode 2
-  'Q8rHDvj4asE'  // Episode 3
-  '_tkDSgd0EDk'  // Episode 4
+  'Q8rHDvj4asE', // Episode 3
+  '_tkDSgd0EDk', // Episode 4 (locked by paywall)
 ];
 
 const freeEpisodes = 3; // Episodes 0,1,2 are free
+const carousel = document.getElementById('carousel');
 const players = [];
 const loadingOverlays = [];
-const totalEpisodes = videoIds.length;
 let currentIndex = 0;
+
+// Dynamically generate episode containers
+videoIds.forEach((vid, index) => {
+  const container = document.createElement('div');
+  container.className = 'episode-container';
+
+  const playerDiv = document.createElement('div');
+  playerDiv.id = `player-${index}`;
+
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'loading-overlay';
+  loadingDiv.id = `loading-${index}`;
+  loadingDiv.innerHTML = `<div class="spinner"></div>Loading...`;
+
+  const lockedDiv = document.createElement('div');
+  lockedDiv.className = 'locked-overlay';
+  lockedDiv.id = `locked-${index}`;
+  lockedDiv.innerHTML = `
+    <p>Locked episode</p>
+    <a href="https://www.paypal.com/pay?your_button_id" target="_blank">
+      <button>Pay to Unlock</button>
+    </a>
+  `;
+
+  // Show locked overlay only for paid episodes
+  if(index >= freeEpisodes){
+    lockedDiv.style.display = 'flex';
+  }
+
+  container.appendChild(playerDiv);
+  container.appendChild(loadingDiv);
+  container.appendChild(lockedDiv);
+  carousel.appendChild(container);
+  loadingOverlays[index] = loadingDiv;
+});
 
 function onYouTubeIframeAPIReady() {
   videoIds.forEach((vid, index) => {
-    const overlay = document.getElementById(`loading-${index}`);
+    const overlay = loadingOverlays[index];
     const lockedOverlay = document.getElementById(`locked-${index}`);
-    loadingOverlays[index] = overlay;
-
-    // Show locked overlay only if episode >= freeEpisodes
-    if(index >= freeEpisodes){
-      lockedOverlay.style.display = 'flex';
-    }
 
     players[index] = new YT.Player(`player-${index}`, {
       height: '100%',
@@ -181,16 +152,15 @@ function onYouTubeIframeAPIReady() {
       playerVars: { rel:0, modestbranding:1 },
       events: {
         onReady: function(event) {
-          // Show loading overlay only after user clicks
           event.target.getIframe().addEventListener('click', () => {
-            // Only show overlay if episode is free or unlocked
+            // Only show loading overlay if episode is free or unlocked
             if(index < freeEpisodes || lockedOverlay.style.display === 'none'){
               overlay.style.display = 'flex';
             }
           });
         },
         onStateChange: function(event) {
-          if (event.data === YT.PlayerState.PLAYING) {
+          if(event.data === YT.PlayerState.PLAYING){
             overlay.style.display = 'none';
           }
         }
@@ -200,7 +170,6 @@ function onYouTubeIframeAPIReady() {
 }
 
 // Arrow navigation
-const carousel = document.getElementById('carousel');
 document.getElementById('arrow-left').onclick = () => {
   if(currentIndex > 0){
     currentIndex--;
@@ -208,7 +177,7 @@ document.getElementById('arrow-left').onclick = () => {
   }
 };
 document.getElementById('arrow-right').onclick = () => {
-  if(currentIndex < totalEpisodes-1){
+  if(currentIndex < videoIds.length-1){
     currentIndex++;
     carousel.children[currentIndex].scrollIntoView({behavior:'smooth'});
   }
@@ -218,7 +187,7 @@ document.getElementById('arrow-right').onclick = () => {
 document.querySelectorAll('.locked-overlay button').forEach(btn=>{
   btn.addEventListener('click', e=>{
     const overlay = e.target.parentElement;
-    overlay.style.display = 'none'; // unlock the episode
+    overlay.style.display = 'none';
   });
 });
 </script>
