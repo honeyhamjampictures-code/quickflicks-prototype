@@ -4,7 +4,6 @@
   <title>ReelShorts-Style Carousel Prototype</title>
   <style>
     body { margin:0; font-family: Arial; overflow-x:hidden; background:black; color:white; }
-
     #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
 
     .episode-container {
@@ -28,7 +27,6 @@
       padding:20px;
     }
 
-    /* Initial tap overlay */
     .tap-overlay {
       position:absolute;
       top:0;
@@ -46,7 +44,6 @@
       background: rgba(0,0,0,0.6);
     }
 
-    /* Loading overlay with spinner */
     .loading-overlay {
       position:absolute;
       top:0;
@@ -73,10 +70,7 @@
       margin-bottom: 10px;
     }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
     #paywall {
       position: fixed;
@@ -110,7 +104,6 @@
 <body>
 
 <div id="carousel"></div>
-
 <div id="arrow-left" class="arrow">&#10094;</div>
 <div id="arrow-right" class="arrow">&#10095;</div>
 
@@ -123,7 +116,6 @@
   <button id="close-paywall">Close</button>
 </div>
 
-<!-- YouTube API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 const episodes = [
@@ -140,15 +132,14 @@ const closePay = document.getElementById("close-paywall");
 let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
 const players = [];
 
-// Render carousel
 function renderCarousel() {
   carousel.innerHTML = "";
 
-  episodes.forEach((ep,i) => {
+  episodes.forEach((ep, i) => {
     const container = document.createElement("div");
     container.className = "episode-container";
 
-    if(!ep.free && !unlocked){
+    if (!ep.free && !unlocked) {
       container.classList.add("locked");
       container.innerText = "Locked – Tap to Unlock";
       container.onclick = () => { paywall.style.display = "block"; };
@@ -157,52 +148,47 @@ function renderCarousel() {
       playerDiv.id = `player-${i}`;
       playerDiv.style.width = "100%";
       playerDiv.style.height = "100%";
-      playerDiv.style.opacity = 0; // hide initially
+      playerDiv.style.opacity = 0; // hidden initially
       container.appendChild(playerDiv);
 
-      // Tap overlay
       const tapOverlay = document.createElement("div");
       tapOverlay.className = "tap-overlay";
       tapOverlay.id = `tap-overlay-${i}`;
-      const text = document.createElement("div");
-      text.innerText = "▶ TAP/PRESS PLAY";
-      tapOverlay.appendChild(text);
+      tapOverlay.innerHTML = "<div>▶ TAP/PRESS PLAY</div>";
       container.appendChild(tapOverlay);
 
       tapOverlay.onclick = () => {
         tapOverlay.style.display = "none";
 
-        // Show loading overlay with spinner
         const loadingOverlay = document.createElement("div");
         loadingOverlay.className = "loading-overlay";
-        const spinner = document.createElement("div");
-        spinner.className = "spinner";
-        const loadingText = document.createElement("div");
-        loadingText.innerText = "Loading...";
-        loadingOverlay.appendChild(spinner);
-        loadingOverlay.appendChild(loadingText);
+        loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
         container.appendChild(loadingOverlay);
 
-        // Play pre-roll ad first
-        players[i].loadVideoById({videoId: ep.ad, startSeconds:0});
-        players[i].mute();
+        // Flag to track first play
+        let firstPlay = true;
 
-        // Listen for when the pre-roll starts playing
-        function onStateChange(event){
-          if(event.data === YT.PlayerState.PLAYING){
-            // After 10s, load main episode
+        function onPlayerStateChange(event) {
+          if (event.data === YT.PlayerState.PLAYING && firstPlay) {
+            firstPlay = false;
+            // After 10s pre-roll, load main episode
             setTimeout(() => {
               players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
               players[i].unMute();
             }, 10000);
-            // Reveal video
+
+            // Show video and remove loading overlay
             playerDiv.style.opacity = 1;
-            // Remove loading overlay
-            container.removeChild(loadingOverlay);
-            players[i].removeEventListener('onStateChange', onStateChange);
+            if (loadingOverlay.parentNode) container.removeChild(loadingOverlay);
           }
         }
-        players[i].addEventListener('onStateChange', onStateChange);
+
+        // Attach event handler for this tap
+        players[i].addEventListener('onStateChange', onPlayerStateChange);
+
+        // Start pre-roll ad
+        players[i].loadVideoById({videoId: ep.ad, startSeconds:0});
+        players[i].mute();
       };
     }
 
@@ -210,36 +196,19 @@ function renderCarousel() {
   });
 }
 
-// Initialize YouTube players
 function onYouTubeIframeAPIReady() {
-  episodes.forEach((ep,i) => {
+  episodes.forEach((ep, i) => {
     players[i] = new YT.Player(`player-${i}`, {
       height: '100%',
       width: '100%',
-      videoId: '',
+      videoId: '', // empty until user tap
       playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':0 },
+      events: {} // will attach onStateChange on tap
     });
   });
 }
 
-// Auto-scroll to next episode
-function setupNextEpisode(index){
-  setTimeout(()=>{
-    const nextIndex = index+1;
-    if(nextIndex < episodes.length){
-      const nextEp = episodes[nextIndex];
-      if(!nextEp.free && !unlocked){
-        paywall.style.display = "block";
-        return;
-      }
-      carousel.children[nextIndex].scrollIntoView({behavior:'smooth'});
-      const nextTapOverlay = carousel.children[nextIndex].querySelector(`#tap-overlay-${nextIndex}`);
-      if(nextTapOverlay) nextTapOverlay.click();
-    }
-  }, 60000); // adjust to episode length
-}
-
-// Arrows
+// Arrow navigation
 document.getElementById('arrow-left').onclick = () => {
   carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
 };
