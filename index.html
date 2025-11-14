@@ -1,193 +1,137 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ReelShorts-Style Carousel Prototype</title>
+  <title>ReelShorts Carousel</title>
   <style>
-    body { margin:0; font-family: Arial; overflow-x:hidden; background:black; color:white; }
-    
-    /* Carousel container */
+    body { margin:0; background:black; overflow-x:hidden; font-family: Arial; }
     #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
-    
-    /* Each episode */
+
     .episode-container {
-      min-width: 100%;
-      height: 100vh;
+      min-width:100%;
+      height:100vh;
       scroll-snap-align:start;
-      position: relative;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background:black;
-    }
-    
-    iframe { width: 100%; height: 100%; border: none; }
-    
-    .locked {
+      position:relative;
       display:flex;
       justify-content:center;
       align-items:center;
-      font-size:28px;
-      cursor:pointer;
-      text-align:center;
-      padding:20px;
+      background:black;
     }
-    
-    /* Overlay for pre-roll ad */
-    .overlay {
+
+    .loading-overlay {
       position:absolute;
       top:0;
       left:0;
       width:100%;
       height:100%;
-      background: rgba(0,0,0,0.6);
-      color:#fff;
-      display:flex;
+      display:none; /* hidden initially */
+      flex-direction: column;
       justify-content:center;
       align-items:center;
+      background: rgba(0,0,0,0.8);
+      color:white;
       font-size:24px;
-      cursor:pointer;
       z-index:2;
+      pointer-events:none; /* does not block iframe clicks */
     }
 
-    /* Paywall modal */
-    #paywall {
-      position: fixed;
-      top:50%; left:50%;
-      transform: translate(-50%, -50%);
-      padding: 20px;
-      border: 2px solid #aaa;
-      background: #fff;
-      color:black;
-      display: none;
-      z-index: 10;
-      text-align:center;
+    .spinner {
+      border: 6px solid rgba(255,255,255,0.3);
+      border-top: 6px solid white;
+      border-radius: 50%;
+      width:50px;
+      height:50px;
+      animation: spin 1s linear infinite;
+      margin-bottom:10px;
     }
-    #close-paywall { margin-left:10px; }
 
-    /* Arrows */
     .arrow {
-      position: absolute;
-      top: 50%;
-      font-size: 48px;
-      color: white;
+      position:absolute;
+      top:50%;
+      font-size:48px;
+      color:white;
       background: rgba(0,0,0,0.3);
-      padding: 10px;
-      cursor: pointer;
-      z-index: 5;
-      user-select: none;
+      padding:10px;
+      cursor:pointer;
+      z-index:3;
+      user-select:none;
     }
-    #arrow-left { left: 10px; transform: translateY(-50%); }
-    #arrow-right { right: 10px; transform: translateY(-50%); }
+    #arrow-left { left:10px; transform:translateY(-50%); }
+    #arrow-right { right:10px; transform:translateY(-50%); }
   </style>
 </head>
 <body>
 
-<!-- Carousel -->
-<div id="carousel"></div>
+<div id="carousel">
+  <!-- Episode 1 -->
+  <div class="episode-container">
+    <div id="player-0"></div>
+    <div class="loading-overlay" id="loading-0">
+      <div class="spinner"></div>
+      Loading...
+    </div>
+  </div>
+  <!-- Episode 2 -->
+  <div class="episode-container">
+    <div id="player-1"></div>
+    <div class="loading-overlay" id="loading-1">
+      <div class="spinner"></div>
+      Loading...
+    </div>
+  </div>
+  <!-- Add more episodes as needed -->
+</div>
 
-<!-- Navigation Arrows -->
 <div id="arrow-left" class="arrow">&#10094;</div>
 <div id="arrow-right" class="arrow">&#10095;</div>
 
-<!-- Paywall Modal -->
-<div id="paywall">
-  <h3>Unlock All Episodes</h3>
-  <p>Purchase the full season to access all locked episodes.</p>
-  <a href="YOUR_PAYPAL_LINK_HERE" target="_blank">
-    <button>Unlock Now</button>
-  </a>
-  <button id="close-paywall">Close</button>
-</div>
-
+<script src="https://www.youtube.com/iframe_api"></script>
 <script>
-// Episode data - replace with your YouTube unlisted video IDs
-const episodes = [
-  { yt: "aKk1p0EiWXs", ad: "AD_VIDEO_ID_1", free: true },
-  { yt: "aKk1p0EiWXs", ad: "AD_VIDEO_ID_2", free: true },
-  { yt: "Q8rHDvj4asE", ad: "AD_VIDEO_ID_3", free: true },
-  { yt: "EPISODE_VIDEO_ID_4", ad: "AD_VIDEO_ID_4", free: false },
-  { yt: "EPISODE_VIDEO_ID_5", ad: "AD_VIDEO_ID_5", free: false }
+const videoIds = [
+  'CuK_NZ01u-I', // Episode 1
+  'aKk1p0EiWXs' // Episode 2
+  // Add more video IDs here
 ];
 
-const carousel = document.getElementById("carousel");
-const paywall = document.getElementById("paywall");
-const closePay = document.getElementById("close-paywall");
+const players = [];
+const loadingOverlays = [];
+const overlayShown = [];
 
-// Track unlocked episodes
-let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
+function onYouTubeIframeAPIReady() {
+  videoIds.forEach((vid, index) => {
+    const overlay = document.getElementById(`loading-${index}`);
+    loadingOverlays[index] = overlay;
+    overlayShown[index] = false;
 
-// Render carousel
-function renderCarousel() {
-  carousel.innerHTML = "";
-  episodes.forEach((ep,i) => {
-    const container = document.createElement("div");
-    container.className = "episode-container";
-
-    if(!ep.free && !unlocked){
-      container.classList.add("locked");
-      container.innerText = "Locked – Tap to Unlock";
-      container.onclick = () => { paywall.style.display = "block"; };
-    } else {
-      // iframe for YouTube (start muted)
-      const iframe = document.createElement("iframe");
-      iframe.src = `https://www.youtube.com/embed/${ep.ad}?rel=0&modestbranding=1&mute=1`;
-      container.appendChild(iframe);
-
-      // overlay for pre-roll ad
-      const overlay = document.createElement("div");
-      overlay.className = "overlay";
-      overlay.id = "overlay"+i;
-      overlay.innerText = "▶ TAP/PRESS PLAY";
-      container.appendChild(overlay);
-
-      overlay.onclick = () => {
-        overlay.style.display = "none";
-
-        // after ad duration (~10s), switch to episode
-        setTimeout(() => {
-          iframe.src = `https://www.youtube.com/embed/${ep.yt}?autoplay=1&rel=0&modestbranding=1&mute=1`;
-          setupNextEpisode(i);
-        }, 10000);
-      };
-    }
-
-    carousel.appendChild(container);
+    players[index] = new YT.Player(`player-${index}`, {
+      height: '100%',
+      width: '100%',
+      videoId: vid,
+      playerVars: { rel:0, modestbranding:1 },
+      events: {
+        onStateChange: function(event) {
+          if (event.data === YT.PlayerState.BUFFERING && !overlayShown[index]) {
+            // show spinner when user clicks the video
+            overlay.style.display = 'flex';
+            overlayShown[index] = true;
+          }
+          if (event.data === YT.PlayerState.PLAYING) {
+            // hide overlay when video starts
+            overlay.style.display = 'none';
+          }
+        }
+      }
+    });
   });
 }
 
-// Auto-scroll to next episode (rough timer)
-function setupNextEpisode(index){
-  setTimeout(()=>{
-    const nextIndex = index + 1;
-    if(nextIndex < episodes.length){
-      const nextEp = episodes[nextIndex];
-      if(!nextEp.free && !unlocked){
-        paywall.style.display = "block";
-        return;
-      }
-      carousel.children[nextIndex].scrollIntoView({behavior:'smooth'});
-      const nextOverlay = carousel.children[nextIndex].querySelector(`[id=overlay${nextIndex}]`);
-      if(nextOverlay) nextOverlay.click();
-    }
-  }, 60000); // adjust to your episode length
-}
-
 // Arrow navigation
-const leftArrow = document.getElementById('arrow-left');
-const rightArrow = document.getElementById('arrow-right');
-
-leftArrow.onclick = () => {
+const carousel = document.getElementById('carousel');
+document.getElementById('arrow-left').onclick = () => {
   carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
 };
-rightArrow.onclick = () => {
+document.getElementById('arrow-right').onclick = () => {
   carousel.scrollBy({ left: window.innerWidth, behavior: 'smooth' });
 };
-
-// Paywall close button
-closePay.onclick = () => { paywall.style.display = "none"; };
-
-// Initialize
-renderCarousel();
 </script>
 
 </body>
