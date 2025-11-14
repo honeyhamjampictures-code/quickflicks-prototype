@@ -131,7 +131,7 @@ const paywall = document.getElementById("paywall");
 const closePay = document.getElementById("close-paywall");
 let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
 const players = [];
-const stateFlags = []; // Track per-player flags
+const stateFlags = []; // Track per-player state
 
 function renderCarousel() {
   carousel.innerHTML = "";
@@ -168,8 +168,11 @@ function renderCarousel() {
         tapOverlay.style.display = "none";
         loadingOverlay.style.display = "flex";
 
-        // Mark user intent to play
+        // Mark user intent
         stateFlags[i].userTapped = true;
+
+        // Start pre-roll muted immediately
+        players[i].mute();
         players[i].playVideo();
       };
 
@@ -185,7 +188,7 @@ function onYouTubeIframeAPIReady() {
     players[i] = new YT.Player(`player-${i}`, {
       height: '100%',
       width: '100%',
-      videoId: ep.ad,
+      videoId: ep.ad, // load pre-roll initially
       playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':0 },
       events: {
         onStateChange: function(event) {
@@ -193,15 +196,13 @@ function onYouTubeIframeAPIReady() {
           const playerDiv = container.querySelector(`#player-${i}`);
           const loadingOverlay = container.querySelector(".loading-overlay");
 
-          // Only act if user tapped
           if (!stateFlags[i].userTapped) return;
 
           if (!stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
             // Pre-roll started
             playerDiv.style.opacity = 1;
-            if (loadingOverlay) loadingOverlay.style.display = "flex"; // show while pre-roll
 
-            // After 10s, switch to main episode
+            // Switch to main episode after 10s
             setTimeout(() => {
               players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
               players[i].unMute();
@@ -210,7 +211,7 @@ function onYouTubeIframeAPIReady() {
           }
 
           if (stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
-            // Main episode playing, remove loading overlay
+            // Main episode started
             if (loadingOverlay) loadingOverlay.style.display = "none";
           }
         }
@@ -219,7 +220,7 @@ function onYouTubeIframeAPIReady() {
   });
 }
 
-// Arrows
+// Arrow navigation
 document.getElementById('arrow-left').onclick = () => {
   carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
 };
@@ -232,6 +233,5 @@ closePay.onclick = () => { paywall.style.display = "none"; };
 
 renderCarousel();
 </script>
-
 </body>
 </html>
