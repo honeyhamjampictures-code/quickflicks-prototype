@@ -161,19 +161,13 @@ function renderCarousel() {
       const loadingOverlay = document.createElement("div");
       loadingOverlay.className = "loading-overlay";
       loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
-      loadingOverlay.style.display = "none";
       container.appendChild(loadingOverlay);
 
       tapOverlay.onclick = () => {
         tapOverlay.style.display = "none";
         loadingOverlay.style.display = "flex";
-
-        // Mark user intent
+        // Flag that user tapped
         stateFlags[i].userTapped = true;
-
-        // Start pre-roll muted immediately
-        players[i].mute();
-        players[i].playVideo();
       };
 
       stateFlags[i] = { userTapped: false, preRollDone: false };
@@ -188,9 +182,12 @@ function onYouTubeIframeAPIReady() {
     players[i] = new YT.Player(`player-${i}`, {
       height: '100%',
       width: '100%',
-      videoId: ep.ad, // load pre-roll initially
-      playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':0 },
+      videoId: ep.ad, // load pre-roll
+      playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':1, 'mute':1 },
       events: {
+        onReady: function(event) {
+          event.target.playVideo(); // autoplay muted
+        },
         onStateChange: function(event) {
           const container = carousel.children[i];
           const playerDiv = container.querySelector(`#player-${i}`);
@@ -202,7 +199,7 @@ function onYouTubeIframeAPIReady() {
             // Pre-roll started
             playerDiv.style.opacity = 1;
 
-            // Switch to main episode after 10s
+            // After 10s, switch to main episode
             setTimeout(() => {
               players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
               players[i].unMute();
@@ -211,7 +208,7 @@ function onYouTubeIframeAPIReady() {
           }
 
           if (stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
-            // Main episode started
+            // Main episode playing
             if (loadingOverlay) loadingOverlay.style.display = "none";
           }
         }
