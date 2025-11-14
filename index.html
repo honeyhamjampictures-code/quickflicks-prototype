@@ -41,7 +41,7 @@
       font-size:24px;
       color:white;
       background: rgba(0,0,0,0.6);
-      pointer-events:none; /* overlay does not block iframe */
+      pointer-events:none; /* overlay does not block iframe click */
     }
 
     .loading-overlay {
@@ -58,7 +58,7 @@
       background: rgba(0,0,0,0.8);
       color:white;
       font-size:24px;
-      display:none; /* hidden initially */
+      display:flex; /* always visible during pre-roll */
     }
 
     .spinner {
@@ -156,7 +156,7 @@ function renderCarousel() {
       const tapOverlay = document.createElement("div");
       tapOverlay.className = "tap-overlay";
       tapOverlay.id = `tap-overlay-${i}`;
-      tapOverlay.innerHTML = "<div>▶ CLICK VIDEO TO PLAY</div>";
+      tapOverlay.innerHTML = "<div>▶ VIDEO LOADING...</div>";
       container.appendChild(tapOverlay);
 
       const loadingOverlay = document.createElement("div");
@@ -179,8 +179,11 @@ function onYouTubeIframeAPIReady() {
       height: '100%',
       width: '100%',
       videoId: ep.ad,
-      playerVars: { 'rel':0, 'modestbranding':1 },
+      playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':1, 'mute':1 },
       events: {
+        onReady: function(event) {
+          event.target.playVideo(); // autoplay muted
+        },
         onStateChange: function(event) {
           const container = carousel.children[i];
           const playerDiv = container.querySelector(`#player-${i}`);
@@ -189,21 +192,18 @@ function onYouTubeIframeAPIReady() {
           if (event.data === YT.PlayerState.PLAYING) {
             playerDiv.style.opacity = 1;
 
-            // Hide tap overlay after first click/play
-            if (flags.tapOverlay) {
-              flags.tapOverlay.style.display = "none";
-            }
+            // Hide tap overlay after first frame
+            if (flags.tapOverlay) flags.tapOverlay.style.display = "none";
 
-            // Show loading overlay briefly if pre-roll not done
+            // Pre-roll → main episode transition
             if (!flags.preRollDone) {
-              if (flags.loadingOverlay) flags.loadingOverlay.style.display = "flex";
-
               setTimeout(() => {
                 players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
                 players[i].unMute();
                 flags.preRollDone = true;
-                if (flags.loadingOverlay) flags.loadingOverlay.style.display = "none";
-              }, 10000);
+              }, 10000); // 10s pre-roll
+            } else {
+              if (flags.loadingOverlay) flags.loadingOverlay.style.display = "none";
             }
           }
         }
