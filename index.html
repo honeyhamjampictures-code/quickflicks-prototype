@@ -23,7 +23,7 @@
       left:0;
       width:100%;
       height:100%;
-      display:none; /* hidden initially */
+      display:none; /* HIDDEN by default */
       flex-direction: column;
       justify-content:center;
       align-items:center;
@@ -116,14 +116,15 @@ function onYouTubeIframeAPIReady() {
       playerVars: { rel:0, modestbranding:1 },
       events: {
         onReady: function(event) {
-          // Show overlay only when user clicks the iframe
+          // Show overlay only after user clicks the iframe
           event.target.getIframe().addEventListener('click', () => {
             overlay.style.display = 'flex';
           });
         },
         onStateChange: function(event) {
           if (event.data === YT.PlayerState.PLAYING) {
-            overlay.style.display = 'none'; // hide overlay when video starts
+            // Hide overlay when video starts
+            overlay.style.display = 'none';
           }
         }
       }
