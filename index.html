@@ -5,10 +5,8 @@
   <style>
     body { margin:0; font-family: Arial; overflow-x:hidden; background:black; color:white; }
 
-    /* Carousel container */
     #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
 
-    /* Each episode */
     .episode-container {
       min-width: 100%;
       height: 100vh;
@@ -18,14 +16,6 @@
       justify-content: center;
       align-items: center;
       background:black;
-    }
-
-    iframe { 
-      width: 100%; 
-      height: 100%; 
-      border: none; 
-      position: relative; 
-      z-index: 1; /* lower than overlay */ 
     }
 
     .locked {
@@ -38,7 +28,6 @@
       padding:20px;
     }
 
-    /* Overlay for pre-roll ad and spinner */
     .overlay {
       position:absolute;
       top:0;
@@ -46,13 +35,14 @@
       width:100%;
       height:100%;
       display:flex;
-      flex-direction: column; /* stack spinner above text */
+      flex-direction: column;
       justify-content:center;
       align-items:center;
       cursor:pointer;
       z-index: 2;
       font-size:24px;
       color:white;
+      background: rgba(0,0,0,0.6);
     }
 
     .spinner {
@@ -70,7 +60,6 @@
       100% { transform: rotate(360deg); }
     }
 
-    /* Paywall modal */
     #paywall {
       position: fixed;
       top:50%; left:50%;
@@ -85,7 +74,6 @@
     }
     #close-paywall { margin-left:10px; }
 
-    /* Arrows */
     .arrow {
       position: absolute;
       top: 50%;
@@ -103,14 +91,11 @@
 </head>
 <body>
 
-<!-- Carousel -->
 <div id="carousel"></div>
 
-<!-- Navigation Arrows -->
 <div id="arrow-left" class="arrow">&#10094;</div>
 <div id="arrow-right" class="arrow">&#10095;</div>
 
-<!-- Paywall Modal -->
 <div id="paywall">
   <h3>Unlock All Episodes</h3>
   <p>Purchase the full season to access all locked episodes.</p>
@@ -120,8 +105,10 @@
   <button id="close-paywall">Close</button>
 </div>
 
+<!-- YouTube API Script -->
+<script src="https://www.youtube.com/iframe_api"></script>
 <script>
-// Episode data - replace with your YouTube unlisted video IDs
+// Episode data
 const episodes = [
   { yt: "aKk1p0EiWXs", ad: "AD_VIDEO_ID_1", free: true },
   { yt: "CuK_NZ01u-I", ad: "AD_VIDEO_ID_2", free: true },
@@ -133,13 +120,15 @@ const episodes = [
 const carousel = document.getElementById("carousel");
 const paywall = document.getElementById("paywall");
 const closePay = document.getElementById("close-paywall");
-
-// Track unlocked episodes
 let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
+
+// Array to store player instances
+const players = [];
 
 // Render carousel
 function renderCarousel() {
   carousel.innerHTML = "";
+
   episodes.forEach((ep,i) => {
     const container = document.createElement("div");
     container.className = "episode-container";
@@ -149,20 +138,20 @@ function renderCarousel() {
       container.innerText = "Locked – Tap to Unlock";
       container.onclick = () => { paywall.style.display = "block"; };
     } else {
-      // Preload ad iframe immediately (muted)
-      const iframe = document.createElement("iframe");
-      iframe.src = `https://www.youtube.com/embed/${ep.ad}?rel=0&modestbranding=1&mute=1`;
-      container.appendChild(iframe);
+      // Placeholder div for YouTube API
+      const playerDiv = document.createElement("div");
+      playerDiv.id = `player-${i}`;
+      playerDiv.style.width = "100%";
+      playerDiv.style.height = "100%";
+      container.appendChild(playerDiv);
 
-      // Overlay for user tap + spinner
+      // Overlay
       const overlay = document.createElement("div");
       overlay.className = "overlay";
       overlay.id = "overlay"+i;
 
-      // Spinner element
       const spinner = document.createElement("div");
       spinner.className = "spinner";
-
       overlay.appendChild(spinner);
 
       const text = document.createElement("div");
@@ -174,9 +163,14 @@ function renderCarousel() {
       overlay.onclick = () => {
         overlay.style.display = "none";
 
-        // Switch iframe to main episode after pre-roll (~10s)
+        // Play pre-roll ad first
+        players[i].loadVideoById({videoId: ep.ad, startSeconds:0});
+        players[i].mute();
+
+        // After ~10s, switch to main episode
         setTimeout(() => {
-          iframe.src = `https://www.youtube.com/embed/${ep.yt}?autoplay=1&rel=0&modestbranding=1&mute=1`;
+          players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
+          players[i].unMute();
           setupNextEpisode(i);
         }, 10000);
       };
@@ -186,7 +180,19 @@ function renderCarousel() {
   });
 }
 
-// Auto-scroll to next episode (rough timer)
+// Initialize YouTube players after API loads
+function onYouTubeIframeAPIReady() {
+  episodes.forEach((ep,i) => {
+    players[i] = new YT.Player(`player-${i}`, {
+      height: '100%',
+      width: '100%',
+      videoId: '', // start empty, will load on tap
+      playerVars: { 'rel': 0, 'modestbranding': 1, 'autoplay': 0 },
+    });
+  });
+}
+
+// Auto-scroll
 function setupNextEpisode(index){
   setTimeout(()=>{
     const nextIndex = index + 1;
@@ -200,24 +206,21 @@ function setupNextEpisode(index){
       const nextOverlay = carousel.children[nextIndex].querySelector(`[id=overlay${nextIndex}]`);
       if(nextOverlay) nextOverlay.click();
     }
-  }, 60000); // adjust to your episode length
+  }, 60000);
 }
 
 // Arrow navigation
-const leftArrow = document.getElementById('arrow-left');
-const rightArrow = document.getElementById('arrow-right');
-
-leftArrow.onclick = () => {
+document.getElementById('arrow-left').onclick = () => {
   carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
 };
-rightArrow.onclick = () => {
+document.getElementById('arrow-right').onclick = () => {
   carousel.scrollBy({ left: window.innerWidth, behavior: 'smooth' });
 };
 
-// Paywall close button
+// Paywall close
 closePay.onclick = () => { paywall.style.display = "none"; };
 
-// Initialize
+// Initialize carousel
 renderCarousel();
 </script>
 
