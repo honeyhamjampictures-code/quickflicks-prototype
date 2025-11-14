@@ -37,11 +37,11 @@
       flex-direction: column;
       justify-content:center;
       align-items:center;
-      cursor:pointer;
       z-index:2;
       font-size:24px;
       color:white;
       background: rgba(0,0,0,0.6);
+      pointer-events:none; /* Overlay does not block iframe click */
     }
 
     .loading-overlay {
@@ -58,6 +58,7 @@
       background: rgba(0,0,0,0.8);
       color:white;
       font-size:24px;
+      display:none;
     }
 
     .spinner {
@@ -131,7 +132,7 @@ const paywall = document.getElementById("paywall");
 const closePay = document.getElementById("close-paywall");
 let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
 const players = [];
-const stateFlags = []; // Track per-player state
+const stateFlags = [];
 
 function renderCarousel() {
   carousel.innerHTML = "";
@@ -149,13 +150,13 @@ function renderCarousel() {
       playerDiv.id = `player-${i}`;
       playerDiv.style.width = "100%";
       playerDiv.style.height = "100%";
-      playerDiv.style.opacity = 0; // hide initially
+      playerDiv.style.opacity = 0;
       container.appendChild(playerDiv);
 
       const tapOverlay = document.createElement("div");
       tapOverlay.className = "tap-overlay";
       tapOverlay.id = `tap-overlay-${i}`;
-      tapOverlay.innerHTML = "<div>▶ TAP/PRESS PLAY</div>";
+      tapOverlay.innerHTML = "<div>▶ CLICK VIDEO TO PLAY</div>";
       container.appendChild(tapOverlay);
 
       const loadingOverlay = document.createElement("div");
@@ -163,14 +164,7 @@ function renderCarousel() {
       loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
       container.appendChild(loadingOverlay);
 
-      tapOverlay.onclick = () => {
-        tapOverlay.style.display = "none";
-        loadingOverlay.style.display = "flex";
-        // Flag that user tapped
-        stateFlags[i].userTapped = true;
-      };
-
-      stateFlags[i] = { userTapped: false, preRollDone: false };
+      stateFlags[i] = { preRollDone: false, loadingOverlay };
     }
 
     carousel.appendChild(container);
@@ -179,37 +173,34 @@ function renderCarousel() {
 
 function onYouTubeIframeAPIReady() {
   episodes.forEach((ep, i) => {
+    if (!ep.free && !unlocked) return;
+
     players[i] = new YT.Player(`player-${i}`, {
       height: '100%',
       width: '100%',
-      videoId: ep.ad, // load pre-roll
-      playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':1, 'mute':1 },
+      videoId: ep.ad,
+      playerVars: { 'rel':0, 'modestbranding':1 },
       events: {
-        onReady: function(event) {
-          event.target.playVideo(); // autoplay muted
-        },
         onStateChange: function(event) {
           const container = carousel.children[i];
           const playerDiv = container.querySelector(`#player-${i}`);
-          const loadingOverlay = container.querySelector(".loading-overlay");
+          const loadingOverlay = stateFlags[i].loadingOverlay;
 
-          if (!stateFlags[i].userTapped) return;
-
-          if (!stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
-            // Pre-roll started
+          if (event.data === YT.PlayerState.PLAYING) {
             playerDiv.style.opacity = 1;
 
-            // After 10s, switch to main episode
-            setTimeout(() => {
-              players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
-              players[i].unMute();
-              stateFlags[i].preRollDone = true;
-            }, 10000);
-          }
+            if (!stateFlags[i].preRollDone) {
+              // Show loading overlay briefly during pre-roll
+              loadingOverlay.style.display = "flex";
 
-          if (stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
-            // Main episode playing
-            if (loadingOverlay) loadingOverlay.style.display = "none";
+              setTimeout(() => {
+                players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
+                players[i].unMute();
+                stateFlags[i].preRollDone = true;
+              }, 10000);
+            } else {
+              loadingOverlay.style.display = "none";
+            }
           }
         }
       }
@@ -230,5 +221,6 @@ closePay.onclick = () => { paywall.style.display = "none"; };
 
 renderCarousel();
 </script>
+
 </body>
 </html>
