@@ -23,7 +23,7 @@
       left:0;
       width:100%;
       height:100%;
-      display:none; /* hidden initially */
+      display:flex; /* visible immediately */
       flex-direction: column;
       justify-content:center;
       align-items:center;
@@ -31,7 +31,7 @@
       color:white;
       font-size:24px;
       z-index:2;
-      pointer-events:none; /* does not block iframe clicks */
+      pointer-events:none; /* does not block clicks */
     }
 
     .spinner {
@@ -78,7 +78,14 @@
       Loading...
     </div>
   </div>
-  <!-- Add more episodes as needed -->
+  <!-- Episode 3 -->
+  <div class="episode-container">
+    <div id="player-2"></div>
+    <div class="loading-overlay" id="loading-2">
+      <div class="spinner"></div>
+      Loading...
+    </div>
+  </div>
 </div>
 
 <div id="arrow-left" class="arrow">&#10094;</div>
@@ -88,19 +95,16 @@
 <script>
 const videoIds = [
   'CuK_NZ01u-I', // Episode 1
-  'aKk1p0EiWXs' // Episode 2
-  // Add more video IDs here
+  'aKk1p0EiWXs', // Episode 2
+  'Q8rHDvj4asE'  // Episode 3
 ];
 
 const players = [];
 const loadingOverlays = [];
-const overlayShown = [];
 
 function onYouTubeIframeAPIReady() {
   videoIds.forEach((vid, index) => {
-    const overlay = document.getElementById(`loading-${index}`);
-    loadingOverlays[index] = overlay;
-    overlayShown[index] = false;
+    loadingOverlays[index] = document.getElementById(`loading-${index}`);
 
     players[index] = new YT.Player(`player-${index}`, {
       height: '100%',
@@ -109,14 +113,9 @@ function onYouTubeIframeAPIReady() {
       playerVars: { rel:0, modestbranding:1 },
       events: {
         onStateChange: function(event) {
-          if (event.data === YT.PlayerState.BUFFERING && !overlayShown[index]) {
-            // show spinner when user clicks the video
-            overlay.style.display = 'flex';
-            overlayShown[index] = true;
-          }
           if (event.data === YT.PlayerState.PLAYING) {
             // hide overlay when video starts
-            overlay.style.display = 'none';
+            loadingOverlays[index].style.display = 'none';
           }
         }
       }
