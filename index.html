@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>ReelShorts-Style Carousel Prototype</title>
+  <title>ReelShorts Carousel</title>
   <style>
     body { margin:0; font-family: Arial; overflow-x:hidden; background:black; color:white; }
     #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
@@ -131,6 +131,7 @@ const paywall = document.getElementById("paywall");
 const closePay = document.getElementById("close-paywall");
 let unlocked = JSON.parse(localStorage.getItem("unlocked")) || false;
 const players = [];
+const stateFlags = []; // Track per-player flags
 
 function renderCarousel() {
   carousel.innerHTML = "";
@@ -148,7 +149,7 @@ function renderCarousel() {
       playerDiv.id = `player-${i}`;
       playerDiv.style.width = "100%";
       playerDiv.style.height = "100%";
-      playerDiv.style.opacity = 0; // hidden initially
+      playerDiv.style.opacity = 0; // hide initially
       container.appendChild(playerDiv);
 
       const tapOverlay = document.createElement("div");
@@ -157,39 +158,22 @@ function renderCarousel() {
       tapOverlay.innerHTML = "<div>▶ TAP/PRESS PLAY</div>";
       container.appendChild(tapOverlay);
 
+      const loadingOverlay = document.createElement("div");
+      loadingOverlay.className = "loading-overlay";
+      loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
+      loadingOverlay.style.display = "none";
+      container.appendChild(loadingOverlay);
+
       tapOverlay.onclick = () => {
         tapOverlay.style.display = "none";
+        loadingOverlay.style.display = "flex";
 
-        const loadingOverlay = document.createElement("div");
-        loadingOverlay.className = "loading-overlay";
-        loadingOverlay.innerHTML = `<div class="spinner"></div><div>Loading...</div>`;
-        container.appendChild(loadingOverlay);
-
-        // Flag to track first play
-        let firstPlay = true;
-
-        function onPlayerStateChange(event) {
-          if (event.data === YT.PlayerState.PLAYING && firstPlay) {
-            firstPlay = false;
-            // After 10s pre-roll, load main episode
-            setTimeout(() => {
-              players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
-              players[i].unMute();
-            }, 10000);
-
-            // Show video and remove loading overlay
-            playerDiv.style.opacity = 1;
-            if (loadingOverlay.parentNode) container.removeChild(loadingOverlay);
-          }
-        }
-
-        // Attach event handler for this tap
-        players[i].addEventListener('onStateChange', onPlayerStateChange);
-
-        // Start pre-roll ad
-        players[i].loadVideoById({videoId: ep.ad, startSeconds:0});
-        players[i].mute();
+        // Mark user intent to play
+        stateFlags[i].userTapped = true;
+        players[i].playVideo();
       };
+
+      stateFlags[i] = { userTapped: false, preRollDone: false };
     }
 
     carousel.appendChild(container);
@@ -201,14 +185,41 @@ function onYouTubeIframeAPIReady() {
     players[i] = new YT.Player(`player-${i}`, {
       height: '100%',
       width: '100%',
-      videoId: '', // empty until user tap
+      videoId: ep.ad,
       playerVars: { 'rel':0, 'modestbranding':1, 'autoplay':0 },
-      events: {} // will attach onStateChange on tap
+      events: {
+        onStateChange: function(event) {
+          const container = carousel.children[i];
+          const playerDiv = container.querySelector(`#player-${i}`);
+          const loadingOverlay = container.querySelector(".loading-overlay");
+
+          // Only act if user tapped
+          if (!stateFlags[i].userTapped) return;
+
+          if (!stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
+            // Pre-roll started
+            playerDiv.style.opacity = 1;
+            if (loadingOverlay) loadingOverlay.style.display = "flex"; // show while pre-roll
+
+            // After 10s, switch to main episode
+            setTimeout(() => {
+              players[i].loadVideoById({videoId: ep.yt, startSeconds:0});
+              players[i].unMute();
+              stateFlags[i].preRollDone = true;
+            }, 10000);
+          }
+
+          if (stateFlags[i].preRollDone && event.data === YT.PlayerState.PLAYING) {
+            // Main episode playing, remove loading overlay
+            if (loadingOverlay) loadingOverlay.style.display = "none";
+          }
+        }
+      }
     });
   });
 }
 
-// Arrow navigation
+// Arrows
 document.getElementById('arrow-left').onclick = () => {
   carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
 };
@@ -216,7 +227,7 @@ document.getElementById('arrow-right').onclick = () => {
   carousel.scrollBy({ left: window.innerWidth, behavior: 'smooth' });
 };
 
-// Paywall close
+// Paywall
 closePay.onclick = () => { paywall.style.display = "none"; };
 
 renderCarousel();
