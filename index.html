@@ -23,7 +23,7 @@
       left:0;
       width:100%;
       height:100%;
-      display:flex; /* visible immediately */
+      display:none; /* hidden initially */
       flex-direction: column;
       justify-content:center;
       align-items:center;
@@ -101,10 +101,13 @@ const videoIds = [
 
 const players = [];
 const loadingOverlays = [];
+let currentIndex = 0;
+const totalEpisodes = videoIds.length;
 
 function onYouTubeIframeAPIReady() {
   videoIds.forEach((vid, index) => {
-    loadingOverlays[index] = document.getElementById(`loading-${index}`);
+    const overlay = document.getElementById(`loading-${index}`);
+    loadingOverlays[index] = overlay;
 
     players[index] = new YT.Player(`player-${index}`, {
       height: '100%',
@@ -112,10 +115,15 @@ function onYouTubeIframeAPIReady() {
       videoId: vid,
       playerVars: { rel:0, modestbranding:1 },
       events: {
+        onReady: function(event) {
+          // Show overlay only when user clicks the iframe
+          event.target.getIframe().addEventListener('click', () => {
+            overlay.style.display = 'flex';
+          });
+        },
         onStateChange: function(event) {
           if (event.data === YT.PlayerState.PLAYING) {
-            // hide overlay when video starts
-            loadingOverlays[index].style.display = 'none';
+            overlay.style.display = 'none'; // hide overlay when video starts
           }
         }
       }
@@ -126,10 +134,16 @@ function onYouTubeIframeAPIReady() {
 // Arrow navigation
 const carousel = document.getElementById('carousel');
 document.getElementById('arrow-left').onclick = () => {
-  carousel.scrollBy({ left: -window.innerWidth, behavior: 'smooth' });
+  if (currentIndex > 0) {
+    currentIndex--;
+    carousel.children[currentIndex].scrollIntoView({ behavior: 'smooth' });
+  }
 };
 document.getElementById('arrow-right').onclick = () => {
-  carousel.scrollBy({ left: window.innerWidth, behavior: 'smooth' });
+  if (currentIndex < totalEpisodes - 1) {
+    currentIndex++;
+    carousel.children[currentIndex].scrollIntoView({ behavior: 'smooth' });
+  }
 };
 </script>
 
