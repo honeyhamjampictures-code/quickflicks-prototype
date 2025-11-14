@@ -4,10 +4,10 @@
   <title>ReelShorts-Style Carousel Prototype</title>
   <style>
     body { margin:0; font-family: Arial; overflow-x:hidden; background:black; color:white; }
-    
+
     /* Carousel container */
     #carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; height:100vh; }
-    
+
     /* Each episode */
     .episode-container {
       min-width: 100%;
@@ -19,9 +19,9 @@
       align-items: center;
       background:black;
     }
-    
+
     iframe { width: 100%; height: 100%; border: none; }
-    
+
     .locked {
       display:flex;
       justify-content:center;
@@ -31,7 +31,7 @@
       text-align:center;
       padding:20px;
     }
-    
+
     /* Overlay for pre-roll ad */
     .overlay {
       position:absolute;
@@ -128,12 +128,12 @@ function renderCarousel() {
       container.innerText = "Locked – Tap to Unlock";
       container.onclick = () => { paywall.style.display = "block"; };
     } else {
-      // iframe for YouTube (start muted)
+      // Preload ad iframe immediately (muted)
       const iframe = document.createElement("iframe");
       iframe.src = `https://www.youtube.com/embed/${ep.ad}?rel=0&modestbranding=1&mute=1`;
       container.appendChild(iframe);
 
-      // overlay for pre-roll ad
+      // Overlay for user tap
       const overlay = document.createElement("div");
       overlay.className = "overlay";
       overlay.id = "overlay"+i;
@@ -143,7 +143,7 @@ function renderCarousel() {
       overlay.onclick = () => {
         overlay.style.display = "none";
 
-        // after ad duration (~10s), switch to episode
+        // Switch iframe to main episode after pre-roll (~10s)
         setTimeout(() => {
           iframe.src = `https://www.youtube.com/embed/${ep.yt}?autoplay=1&rel=0&modestbranding=1&mute=1`;
           setupNextEpisode(i);
@@ -184,11 +184,4 @@ rightArrow.onclick = () => {
 };
 
 // Paywall close button
-closePay.onclick = () => { paywall.style.display = "none"; };
-
-// Initialize
-renderCarousel();
-</script>
-
-</body>
-</html>
+closePay.onclick = () =
